@@ -10,9 +10,9 @@
             "type": "python",
             "request": "launch",
             "module": "uvicorn",
-            "env": {"PYTHONPATH":"${workspaceFolder}/backend/app"},
+            "env": {"PYTHONPATH":"${workspaceFolder}\\backend\\app"},
             "args": [
-                "main:app"
+                "main:app",
             ],
             "jinja": true,
             "justMyCode": true

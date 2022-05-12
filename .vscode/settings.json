@@ -8,10 +8,12 @@
       },
 
       "terminal.integrated.defaultProfile.windows": "PowerShell",
+
+    
+
+      "python.testing.cwd": "${workspaceFolder}\\backend\\app",
       "python.testing.pytestArgs": [
-        "--rootdir",
-        "${workspaceFolder}/backend/app",
-        "backend"
+        "tests"
       ],
       "python.testing.unittestEnabled": false,
       "python.testing.pytestEnabled": true,
