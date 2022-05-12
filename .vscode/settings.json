@@ -9,6 +9,8 @@
 
       "terminal.integrated.defaultProfile.windows": "PowerShell",
       "python.testing.pytestArgs": [
+        "--rootdir",
+        "${workspaceFolder}/backend/app",
         "backend"
       ],
       "python.testing.unittestEnabled": false,
