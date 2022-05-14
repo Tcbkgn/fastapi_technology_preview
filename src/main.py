@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta
+import json
 import sqlite3
 
 from jose import JWTError, jwt
-#from passlib.context import CryptContext
 from pydantic import BaseModel
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestFormStrict
@@ -10,16 +10,17 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import Session
 
 from src.db.schemas import User
-from src.db.utils import get_engine
+from src.db.utils import get_engine, get_pwd_context
 
-SECRET_KEY = "SuperSecret"
+with open("configuration.json") as conf:
+    configuration = json.load(conf)
+    SECRET_KEY = configuration["secret"]
 
 app = FastAPI()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 engine = get_engine()
 SessionLocal = sessionmaker(bind=engine)
-#pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
+pwd_context = get_pwd_context()
 
 def get_db():
     db = SessionLocal()
@@ -40,17 +41,15 @@ def create_access_token(username, minutes):
 async def current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
     try:
         payload = jwt.decode(token, SECRET_KEY)
-        username = payload.get("sub")
-        expiration = payload.get("exp")
-
-        user = db.query(User).filter(User.username == username).first()
-    except JWTError as err:
+        username = payload["sub"]
+        expiration = payload["exp"]
+    except (JWTError, KeyError) as err:
         raise HTTPException(401, "Unauthorized", headers={"WWW-Authenticate": "Bearer"}) from err
 
+    user = db.query(User).filter(User.username == username).first()
     if user is None:
         raise HTTPException(401, "Unauthorized", headers={"WWW-Authenticate": "Bearer"})
 
-    print(int(datetime.utcnow().timestamp()) - expiration)
     return user
 
 
@@ -62,11 +61,11 @@ async def hello(token: str = Depends(current_user)):
 @app.post("/token")
 async def login(form_data: OAuth2PasswordRequestFormStrict = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == form_data.username).first()
-
     if user is None:
         raise HTTPException(400, detail="Incorrect username")
-    if user.password != form_data.password:
+
+    if not pwd_context.verify(secret=form_data.password, hash=user.password):
         raise HTTPException(400, detail="Incorrect password")
 
-    token = create_access_token(user.username, minutes=5)
+    token = create_access_token(user.username, minutes=2)
     return {"access_token": token, "token_type": "bearer"}

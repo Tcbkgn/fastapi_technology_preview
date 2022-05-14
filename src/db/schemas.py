@@ -12,12 +12,14 @@ class User(Base):
     password = Column(String)
 
 if __name__ == "__main__":
-    from utils import get_engine
+    from utils import get_engine, get_pwd_context
+    from passlib.context import CryptContext
     engine = get_engine()
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     SessionLocal = sessionmaker(bind=engine)
     db = SessionLocal()
-    user = User(username="admin", password="admin")
+    pwd_context = get_pwd_context()
+    user = User(username="admin", password=pwd_context.hash("admin"))
     db.add(user)
     db.commit()
