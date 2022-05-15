@@ -1,3 +1,4 @@
 {
-    "secret": "SECRET"
+    "jwt_secret": "SECRET",
+    "admin_password": "admin"
 }

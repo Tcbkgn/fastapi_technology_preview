@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-import json
 import sqlite3
 
 from jose import JWTError, jwt
@@ -9,12 +8,9 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestFormStri
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import Session
 
+from src import config
 from src.db.schemas import User
-from src.db.utils import get_engine, get_pwd_context
-
-with open("configuration.json") as conf:
-    configuration = json.load(conf)
-    SECRET_KEY = configuration["secret"]
+from src.utils import get_engine, get_pwd_context
 
 app = FastAPI()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -35,12 +31,12 @@ def create_access_token(username, minutes):
         "sub": username,
         "exp": datetime.utcnow() + timedelta(minutes=minutes)
     }
-    return jwt.encode(data, SECRET_KEY)
+    return jwt.encode(data, config.SECRET_KEY)
 
 
 async def current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
     try:
-        payload = jwt.decode(token, SECRET_KEY)
+        payload = jwt.decode(token, config.SECRET_KEY)
         username = payload["sub"]
         expiration = payload["exp"]
     except (JWTError, KeyError) as err:
