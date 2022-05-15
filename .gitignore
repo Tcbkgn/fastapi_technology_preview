@@ -1,5 +1,5 @@
 database.db
 __pycache__/
 *.py[cod]
-.vscode/
+.vscode/*
 .pytest_cache

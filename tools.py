@@ -3,9 +3,10 @@ import argparse
 from passlib.context import CryptContext
 from sqlalchemy.orm import sessionmaker
 
-from src import config
-from src.db.schemas import Base, User
-from src.utils import get_engine, get_pwd_context
+from backend.app import config
+from backend.app.utils import get_engine, get_pwd_context
+from backend.db.schemas import Base, User
+
 
 
 if __name__ == "__main__":
