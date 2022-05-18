@@ -1,4 +1,3 @@
-import enum
-
-class Scope(str, enum.Enum):
-    ME = "me"
+LOGGED_IN = "logged_in"
+ACTIVE = "active"
+ADMIN = "admin"
