@@ -24,9 +24,9 @@ oauth2_scheme = OAuth2PasswordBearer(
 )
 pwd_context = get_pwd_context()
 
-def create_access_token(username: str, minutes: int, scopes: list):
+def create_access_token(user_id: int, minutes: int, scopes: list):
     data = {
-        "sub": username,
+        "sub": str(user_id),
         "scopes": scopes,
         "exp": datetime.utcnow() + timedelta(minutes=minutes)
     }
@@ -53,12 +53,12 @@ async def current_user(scopes: SecurityScopes, db: Session = Depends(get_db), to
     }
     try:
         payload = jwt.decode(token, config.SECRET_KEY)
-        username = payload["sub"]
+        _id = int(payload["sub"])
         token_scopes = payload.get("scopes", [])
     except (JWTError, KeyError) as err:
         raise HTTPException(401, "Unauthorized", headers=headers) from err
 
-    user = db.query(User).filter(User.username == username).first()
+    user = db.query(User).filter(User.id == _id).first()
     if user is None:
         raise HTTPException(401, "Unauthorized", headers=headers)
 
@@ -79,5 +79,5 @@ async def login(form_data: OAuth2PasswordRequestFormStrict = Depends(), db: Sess
 
     verify_scopes(user, form_data.scopes)
 
-    token = create_access_token(user.username, minutes=15, scopes=form_data.scopes)
+    token = create_access_token(user.id, minutes=15, scopes=form_data.scopes)
     return {"access_token": token, "token_type": "bearer"}
