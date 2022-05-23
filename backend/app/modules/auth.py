@@ -9,10 +9,11 @@ from sqlalchemy.orm import Session
 from backend.app import config
 from backend.app import models
 from backend.app import scopes
+from backend.app.tags import Tags
 from backend.app.utils import get_db, get_pwd_context
 from backend.db.schemas import User
 
-router = APIRouter(prefix="/api/auth")
+router = APIRouter(prefix="/api/auth", tags=[Tags.auth])
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="api/auth/token",
