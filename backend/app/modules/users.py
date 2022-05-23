@@ -14,7 +14,7 @@ async def me(user: models.User = Security(current_user, scopes=[scopes.LOGGED_IN
     return user
 
 
-@router.patch("/me")
+@router.patch("/me", status_code=204)
 async def me(
     username: str = Body(None),
     password: str = Body(None),
@@ -43,7 +43,7 @@ async def get_user(
     return user
 
 
-@router.post("/user", response_model=models.User)
+@router.post("/user", response_model=models.User, status_code=201)
 async def add_user(
     username: str = Body(...),
     password: str = Body(...),
@@ -62,7 +62,7 @@ async def add_user(
     return user
 
 
-@router.patch("/user/{id}")
+@router.patch("/user/{id}", status_code=204)
 async def modify_user(
     id: int,
     username: str = Body(None),
