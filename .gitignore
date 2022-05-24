@@ -1,0 +1,7 @@
+__pycache__
+.pytest_cache
+*.py[cod]
+environment/images/isolinux/*
+environment/images/pxeboot/*
+environment/images/syslinux/*
+environment/*.vdi
