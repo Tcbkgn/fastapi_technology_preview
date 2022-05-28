@@ -1,8 +1,9 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 class User(BaseModel):
     id: int
     username: str
+    email: EmailStr
     active: bool
     admin: bool
     class Config:

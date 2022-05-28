@@ -80,5 +80,5 @@ async def login(form_data: OAuth2PasswordRequestFormStrict = Depends(), db: Sess
 
     verify_scopes(user, form_data.scopes)
 
-    token = create_access_token(user.id, minutes=15, scopes=form_data.scopes)
+    token = create_access_token(user.id, minutes=120, scopes=form_data.scopes)
     return {"access_token": token, "token_type": "bearer"}

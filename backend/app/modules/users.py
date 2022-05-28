@@ -1,6 +1,11 @@
-from fastapi import APIRouter, Body, Depends, HTTPException, Security
+from datetime import datetime, timedelta
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, Security
+from jose import JWTError, jwt
+from pydantic import EmailStr
 from sqlalchemy.orm import Session
 
+from backend.app import config
 from backend.app import models
 from backend.app import scopes
 from backend.app.modules.auth import current_user
@@ -8,13 +13,79 @@ from backend.app.tags import Tags
 from backend.app.utils import get_db, get_pwd_context
 from backend.db.schemas import User
 
+ACTIVATION_EMAIL_EXPIRATION = 15 # minutes
 
 user_router = APIRouter(prefix="/api/users", tags=[Tags.users])
 admin_router = APIRouter(prefix="/api/users", tags=[Tags.users_admin])
 
+
+def send_activation_email(url, user_id):
+    data = {
+        "sub": str(user_id),
+        "scopes": [scopes.ACTIVATE],
+        "exp": datetime.utcnow() + timedelta(minutes=ACTIVATION_EMAIL_EXPIRATION)
+    }
+    token = jwt.encode(data, config.SECRET_KEY)
+    host_address = "{scheme}://{netloc}".format(scheme=url.scheme, netloc=url.netloc)
+    print (host_address + user_router.url_path_for("activate_account", token=token))
+    #TODO: send email
+
+
+@user_router.post("/create", response_model=models.User)
+async def create_account(
+    username: str,
+    password: str,
+    email: EmailStr,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    pwd_context = get_pwd_context()
+    if db.query(User).filter(User.email == email).first():
+        raise HTTPException(400, "Email already used.")
+    if db.query(User).filter(User.username == username).first():
+        raise HTTPException(400, "Username already used.")
+    user = User(username=username, password=pwd_context.hash(password), active=False, admin=False, email=email)
+    db.add(user)
+    db.commit()
+    send_activation_email(request.url, user.id)
+    return user
+
+@user_router.get("/activate/{token}", status_code=200)
+async def activate_account(
+    token: str,
+    db: Session = Depends(get_db),
+):
+    try:
+        payload = jwt.decode(token, config.SECRET_KEY)
+        _id = int(payload["sub"])
+        token_scopes = payload.get("scopes", [])
+    except (JWTError, KeyError) as err:
+        raise HTTPException(401, "Unauthorized") from err
+
+    if not scopes.ACTIVATE in token_scopes:
+        raise HTTPException(401, "Unauthorized")
+
+    user = db.query(User).filter(User.id == _id).first()
+    if user is None:
+        raise HTTPException(401, "Unauthorized")
+
+    if user.active:
+        raise HTTPException(400, "Account is already activated.")
+
+    user.active = True
+    db.commit()
+
+    return {"message": "Activated account for user: {}".format(user.username)}
+
+
 @user_router.get("/me", response_model=models.User)
 async def me(user: models.User = Security(current_user, scopes=[scopes.LOGGED_IN])):
     return user
+
+
+@user_router.post("/me/resend_activation", response_model=models.User)
+async def me(request: Request, user: models.User = Security(current_user, scopes=[scopes.LOGGED_IN])):
+    send_activation_email(request.url, user.id)
 
 
 @user_router.patch("/me", status_code=204)
@@ -22,10 +93,12 @@ async def me(
     username: str = Body(None),
     password: str = Body(None),
     db: Session = Depends(get_db),
-    user: models.User = Security(current_user, scopes=[scopes.LOGGED_IN])
+    user: models.User = Security(current_user, scopes=[scopes.ACTIVE])
 ):
     db_user = db.query(User).filter(User.id == user.id).first()
     if username:
+        if db.query(User).filter(User.username == username).first():
+            raise HTTPException(400, "Username already used.")
         db_user.username = username
     if password:
         pwd_context = get_pwd_context()
@@ -33,7 +106,7 @@ async def me(
     db.commit()
 
 
-@admin_router.get("/user/{id}", response_model=models.User)
+@admin_router.get("/u/{id}", response_model=models.User)
 async def get_user(
     id: int,
     db: Session = Depends(get_db),
@@ -46,10 +119,11 @@ async def get_user(
     return user
 
 
-@admin_router.post("/user", response_model=models.User, status_code=201)
+@admin_router.post("/u", response_model=models.User, status_code=201)
 async def add_user(
     username: str = Body(...),
     password: str = Body(...),
+    email: str = Body(...),
     active: bool = Body(False),
     admin: bool = Body(False),
     db: Session = Depends(get_db),
@@ -58,18 +132,19 @@ async def add_user(
     pwd_context = get_pwd_context()
     if db.query(User).filter(User.username == username).first():
         raise HTTPException(400, "Username already used.")
-    user = User(username=username, password=pwd_context.hash(password), active=False, admin=False)
+    user = User(username=username, password=pwd_context.hash(password), email=email, active=False, admin=False)
     db.add(user)
     db.commit()
 
     return user
 
 
-@admin_router.patch("/user/{id}", status_code=204)
+@admin_router.patch("/u/{id}", status_code=204)
 async def modify_user(
     id: int,
     username: str = Body(None),
     password: str = Body(None),
+    email: str = Body(...),
     active: bool = Body(None),
     admin: bool = Body(None),
     db: Session = Depends(get_db),
@@ -81,6 +156,8 @@ async def modify_user(
     if password:
         pwd_context = get_pwd_context()
         user.password = pwd_context.hash(password)
+    if email:
+        user.email = email
     if active:
         user.active = active
     if admin:

@@ -13,6 +13,7 @@ SQLAlchemy = "^1.4.36"
 python-jose = {extras = ["cryptography"], version = "^3.3.0"}
 passlib = "^1.7.4"
 bcrypt = "^3.2.2"
+pydantic = {extras = ["email"], version = "^1.9.1"}
 
 [tool.poetry.dev-dependencies]
 pydevd = "^2.8.0"
