@@ -1,4 +1,9 @@
 {
     "jwt_secret": "SECRET",
-    "admin_password": "admin"
+    "admin_password": "admin",
+    "smtp_server": "smtp.gmail.com",
+    "smtp_port": 587,
+    "email": "email@server.com",
+    "email_password": "password",
+    "service_name": "test-service"
 }

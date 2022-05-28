@@ -1,4 +1,7 @@
 from datetime import datetime, timedelta
+import traceback
+import smtplib
+import ssl
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, Security
 from jose import JWTError, jwt
@@ -14,21 +17,42 @@ from backend.app.utils import get_db, get_pwd_context
 from backend.db.schemas import User
 
 ACTIVATION_EMAIL_EXPIRATION = 15 # minutes
+ACTIVATION_MESSAGE = """\
+Subject: Activate your account for: {service}
+
+Here is your activation link for your {service} account:
+{url}
+
+Have a good time using {service}!
+"""
 
 user_router = APIRouter(prefix="/api/users", tags=[Tags.users])
 admin_router = APIRouter(prefix="/api/users", tags=[Tags.users_admin])
 
 
-def send_activation_email(url, user_id):
+def send_activation_email(url, user):
     data = {
-        "sub": str(user_id),
+        "sub": str(user.id),
         "scopes": [scopes.ACTIVATE],
         "exp": datetime.utcnow() + timedelta(minutes=ACTIVATION_EMAIL_EXPIRATION)
     }
     token = jwt.encode(data, config.SECRET_KEY)
     host_address = "{scheme}://{netloc}".format(scheme=url.scheme, netloc=url.netloc)
-    print (host_address + user_router.url_path_for("activate_account", token=token))
-    #TODO: send email
+
+    context = ssl.create_default_context()
+    try:
+        server = smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT)
+        server.starttls(context=context)
+        server.login(config.EMAIL, config.EMAIL_PASSWORD)
+        message = ACTIVATION_MESSAGE.format(
+            service=config.SERVICE_NAME,
+            url=host_address + user_router.url_path_for("activate_account", token=token)
+        )
+        server.sendmail(config.EMAIL, user.email, message)
+    except Exception as e:
+        print("ERROR: Cannot send email - {err}".format(err=traceback.format_exception(e)))
+    finally:
+        server.quit()
 
 
 @user_router.post("/create", response_model=models.User)
@@ -47,7 +71,7 @@ async def create_account(
     user = User(username=username, password=pwd_context.hash(password), active=False, admin=False, email=email)
     db.add(user)
     db.commit()
-    send_activation_email(request.url, user.id)
+    send_activation_email(request.url, user)
     return user
 
 @user_router.get("/activate/{token}", status_code=200)
@@ -85,10 +109,10 @@ async def me(user: models.User = Security(current_user, scopes=[scopes.LOGGED_IN
 
 @user_router.post("/me/resend_activation", response_model=models.User)
 async def me(request: Request, user: models.User = Security(current_user, scopes=[scopes.LOGGED_IN])):
-    send_activation_email(request.url, user.id)
+    send_activation_email(request.url, user)
 
 
-@user_router.patch("/me", status_code=204)
+@user_router.patch("/me")
 async def me(
     username: str = Body(None),
     password: str = Body(None),
@@ -139,7 +163,7 @@ async def add_user(
     return user
 
 
-@admin_router.patch("/u/{id}", status_code=204)
+@admin_router.patch("/u/{id}")
 async def modify_user(
     id: int,
     username: str = Body(None),
