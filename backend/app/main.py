@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
-from backend.app.modules import auth
-from backend.app.modules import users
+from backend.app.routes import auth
+from backend.app.routes import users
 
 app = FastAPI(redoc_url="/api")
 

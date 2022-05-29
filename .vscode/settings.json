@@ -9,7 +9,7 @@
 
       "terminal.integrated.defaultProfile.windows": "PowerShell",
 
-    
+
 
       "python.testing.cwd": "${workspaceFolder}\\backend\\app",
       "python.testing.pytestArgs": [
@@ -17,4 +17,6 @@
       ],
       "python.testing.unittestEnabled": false,
       "python.testing.pytestEnabled": true,
+      "python.linting.enabled": true,
+      "python.linting.pylintEnabled": true,
 }

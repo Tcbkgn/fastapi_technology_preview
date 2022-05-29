@@ -1,4 +1,3 @@
-from datetime import datetime, timedelta
 import traceback
 import smtplib
 import ssl
@@ -11,7 +10,7 @@ from sqlalchemy.orm import Session
 from backend.app import config
 from backend.app import models
 from backend.app import scopes
-from backend.app.modules.auth import current_user
+from backend.app.modules.auth import create_access_token, current_user
 from backend.app.tags import Tags
 from backend.app.utils import get_db, get_pwd_context
 from backend.db.schemas import User
@@ -31,12 +30,7 @@ admin_router = APIRouter(prefix="/api/users", tags=[Tags.users_admin])
 
 
 def send_activation_email(url, user):
-    data = {
-        "sub": str(user.id),
-        "scopes": [scopes.ACTIVATE],
-        "exp": datetime.utcnow() + timedelta(minutes=ACTIVATION_EMAIL_EXPIRATION)
-    }
-    token = jwt.encode(data, config.SECRET_KEY)
+    token = create_access_token(user.id, ACTIVATION_EMAIL_EXPIRATION, [scopes.ACTIVATE])
     host_address = "{scheme}://{netloc}".format(scheme=url.scheme, netloc=url.netloc)
 
     context = ssl.create_default_context()
@@ -49,7 +43,7 @@ def send_activation_email(url, user):
             url=host_address + user_router.url_path_for("activate_account", token=token)
         )
         server.sendmail(config.EMAIL, user.email, message)
-    except Exception as e:
+    except smtplib.SMTPException as e:
         print("ERROR: Cannot send email - {err}".format(err=traceback.format_exception(e)))
     finally:
         server.quit()
@@ -103,17 +97,17 @@ async def activate_account(
 
 
 @user_router.get("/me", response_model=models.User)
-async def me(user: models.User = Security(current_user, scopes=[scopes.LOGGED_IN])):
+async def get_my_user(user: models.User = Security(current_user, scopes=[scopes.LOGGED_IN])):
     return user
 
 
 @user_router.post("/me/resend_activation", response_model=models.User)
-async def me(request: Request, user: models.User = Security(current_user, scopes=[scopes.LOGGED_IN])):
+async def resend_activation(request: Request, user: models.User = Security(current_user, scopes=[scopes.LOGGED_IN])):
     send_activation_email(request.url, user)
 
 
 @user_router.patch("/me")
-async def me(
+async def modify_my_user(
     username: str = Body(None),
     password: str = Body(None),
     db: Session = Depends(get_db),
@@ -156,7 +150,7 @@ async def add_user(
     pwd_context = get_pwd_context()
     if db.query(User).filter(User.username == username).first():
         raise HTTPException(400, "Username already used.")
-    user = User(username=username, password=pwd_context.hash(password), email=email, active=False, admin=False)
+    user = User(username=username, password=pwd_context.hash(password), email=email, active=active, admin=admin)
     db.add(user)
     db.commit()
 
