@@ -2,7 +2,7 @@ import traceback
 import smtplib
 import ssl
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request, Security
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Request, Security
 from jose import JWTError, jwt
 from pydantic import EmailStr
 from sqlalchemy.orm import Session
@@ -29,7 +29,7 @@ user_router = APIRouter(prefix="/api/users", tags=[Tags.users])
 admin_router = APIRouter(prefix="/api/users", tags=[Tags.users_admin])
 
 
-def send_activation_email(url, user):
+def send_activation_email_task(url, user):
     token = create_access_token(user.id, ACTIVATION_EMAIL_EXPIRATION, [scopes.ACTIVATE])
     host_address = "{scheme}://{netloc}".format(scheme=url.scheme, netloc=url.netloc)
 
@@ -43,6 +43,7 @@ def send_activation_email(url, user):
             url=host_address + user_router.url_path_for("activate_account", token=token)
         )
         server.sendmail(config.EMAIL, user.email, message)
+        print("SUCCESS: Activation email sent to {user}".format(user=user.username))
     except smtplib.SMTPException as e:
         print("ERROR: Cannot send email - {err}".format(err=traceback.format_exception(e)))
     finally:
@@ -55,6 +56,7 @@ async def create_account(
     password: str,
     email: EmailStr,
     request: Request,
+    tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     pwd_context = get_pwd_context()
@@ -65,7 +67,7 @@ async def create_account(
     user = User(username=username, password=pwd_context.hash(password), active=False, admin=False, email=email)
     db.add(user)
     db.commit()
-    send_activation_email(request.url, user)
+    tasks.add_task(send_activation_email_task, url=request.url, user=user)
     return user
 
 @user_router.get("/activate/{token}", status_code=200)
@@ -101,23 +103,37 @@ async def get_my_user(user: models.User = Security(current_user, scopes=[scopes.
     return user
 
 
-@user_router.post("/me/resend_activation", response_model=models.User)
-async def resend_activation(request: Request, user: models.User = Security(current_user, scopes=[scopes.LOGGED_IN])):
-    send_activation_email(request.url, user)
+@user_router.post("/me/resend_activation", response_model=models.User, status_code=202)
+async def resend_activation(
+    request: Request,
+    tasks: BackgroundTasks,
+    user: models.User = Security(current_user, scopes=[scopes.LOGGED_IN])
+):
+    tasks.add_task(send_activation_email_task, url=request.url, user=user)
 
 
 @user_router.patch("/me")
 async def modify_my_user(
+    request: Request,
+    tasks: BackgroundTasks,
     username: str = Body(None),
     password: str = Body(None),
+    email: EmailStr = Body(None),
     db: Session = Depends(get_db),
-    user: models.User = Security(current_user, scopes=[scopes.ACTIVE])
+    user: models.User = Security(current_user, scopes=[scopes.LOGGED_IN])
 ):
     db_user = db.query(User).filter(User.id == user.id).first()
-    if username:
+    if username and username != db_user.username:
         if db.query(User).filter(User.username == username).first():
             raise HTTPException(400, "Username already used.")
         db_user.username = username
+    if email and email != db_user.email:
+        if db.query(User).filter(User.email == email).first():
+            raise HTTPException(400, "Email already used.")
+        db_user.email = email
+        if not db_user.admin:
+            db_user.active = False
+            tasks.add_task(send_activation_email_task, url=request.url, user=user)
     if password:
         pwd_context = get_pwd_context()
         db_user.password = pwd_context.hash(password)
