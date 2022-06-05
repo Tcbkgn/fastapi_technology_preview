@@ -11,7 +11,7 @@ from backend.app.modules import auth
 router = APIRouter(prefix="/api/auth", tags=[Tags.auth])
 pwd_context = get_pwd_context()
 
-@router.post("/token", response_model=models.Token)
+@router.post("/token", response_model=models.Token, responses={"400": {"description": "Incorrect username"}})
 async def login(
     form_data: OAuth2PasswordRequestFormStrict = Depends(), db: Session = Depends(get_db)
 ):

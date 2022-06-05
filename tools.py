@@ -1,6 +1,5 @@
 import argparse
 
-from passlib.context import CryptContext
 from sqlalchemy.orm import sessionmaker
 
 from backend.app import config
