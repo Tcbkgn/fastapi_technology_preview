@@ -15,6 +15,9 @@ pwd_context = get_pwd_context()
 async def login(
     form_data: OAuth2PasswordRequestFormStrict = Depends(), db: Session = Depends(get_db)
 ):
+    """
+    Authorize with the API.
+    """
     user = db.query(User).filter(User.username == form_data.username).first()
     if user is None:
         raise HTTPException(400, detail="Incorrect username")

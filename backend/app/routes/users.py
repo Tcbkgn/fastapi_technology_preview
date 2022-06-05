@@ -59,6 +59,9 @@ async def create_account(
     tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
+    """
+    Creates a new account. Sends an activation link to the given email address.
+    """
     pwd_context = get_pwd_context()
     if db.query(User).filter(User.email == email).first():
         raise HTTPException(400, "Email already used.")
@@ -75,6 +78,7 @@ async def activate_account(
     token: str,
     db: Session = Depends(get_db),
 ):
+    "Activation link, sent to the users email."
     try:
         payload = jwt.decode(token, config.SECRET_KEY)
         _id = int(payload["sub"])
@@ -100,6 +104,9 @@ async def activate_account(
 
 @user_router.get("/me", response_model=models.User)
 async def get_my_user(user: models.User = Security(current_user, scopes=[scopes.LOGGED_IN])):
+    """
+    Returns information about the authorized user.
+    """
     return user
 
 
@@ -109,6 +116,9 @@ async def resend_activation(
     tasks: BackgroundTasks,
     user: models.User = Security(current_user, scopes=[scopes.LOGGED_IN])
 ):
+    """
+    Sends an activation link to the authorized users email.
+    """
     tasks.add_task(send_activation_email_task, url=request.url, user=user)
 
 
@@ -122,6 +132,9 @@ async def modify_my_user(
     db: Session = Depends(get_db),
     user: models.User = Security(current_user, scopes=[scopes.LOGGED_IN])
 ):
+    """
+    Modifies the users data.
+    """
     db_user = db.query(User).filter(User.id == user.id).first()
     if username and username != db_user.username:
         if db.query(User).filter(User.username == username).first():
@@ -146,6 +159,9 @@ async def get_user(
     db: Session = Depends(get_db),
     user: models.User = Security(current_user, scopes=[scopes.ADMIN])
 ):
+    """
+    Gets the users data.
+    """
     user = db.query(User).filter(User.id == _id).first()
     if user is None:
         raise HTTPException(404, "No user with id {_id}".format(_id=_id))
@@ -163,6 +179,9 @@ async def add_user(
     db: Session = Depends(get_db),
     user: models.User = Security(current_user, scopes=[scopes.ADMIN])
 ):
+    """
+    Adds a new user.
+    """
     pwd_context = get_pwd_context()
     if db.query(User).filter(User.username == username).first():
         raise HTTPException(400, "Username already used.")
@@ -184,6 +203,9 @@ async def modify_user(
     db: Session = Depends(get_db),
     user: models.User = Security(current_user, scopes=[scopes.ADMIN])
 ):
+    """
+    Modifies the user.
+    """
     user = db.query(User).filter(User.id == _id).first()
     if username:
         user.username = username

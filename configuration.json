@@ -5,5 +5,5 @@
     "smtp_port": 587,
     "email": "email@server.com",
     "email_password": "password",
-    "service_name": "test-service"
+    "service_name": "User service"
 }
