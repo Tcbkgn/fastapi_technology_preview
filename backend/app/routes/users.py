@@ -142,13 +142,13 @@ async def modify_my_user(
 
 @admin_router.get("/u/{id}", response_model=models.User)
 async def get_user(
-    id: int,
+    _id: int,
     db: Session = Depends(get_db),
     user: models.User = Security(current_user, scopes=[scopes.ADMIN])
 ):
-    user = db.query(User).filter(User.id == id).first()
+    user = db.query(User).filter(User.id == _id).first()
     if user is None:
-        raise HTTPException(404, "No user with id {_id}".format(_id=id))
+        raise HTTPException(404, "No user with id {_id}".format(_id=_id))
 
     return user
 
@@ -175,7 +175,7 @@ async def add_user(
 
 @admin_router.patch("/u/{id}")
 async def modify_user(
-    id: int,
+    _id: int,
     username: str = Body(None),
     password: str = Body(None),
     email: str = Body(...),
@@ -184,7 +184,7 @@ async def modify_user(
     db: Session = Depends(get_db),
     user: models.User = Security(current_user, scopes=[scopes.ADMIN])
 ):
-    user = db.query(User).filter(User.id == id).first()
+    user = db.query(User).filter(User.id == _id).first()
     if username:
         user.username = username
     if password:
